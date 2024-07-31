@@ -1,0 +1,52 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: video-vs:vert
+      frag: video-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        uScale:
+          value: [1.0, 1.0, 0.0, 1.0]
+        uSampler:
+          value: 0
+}%
+
+CCProgram video-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+
+  in vec2 aVertexPosition;
+  out vec2 vTextureCoord;
+  uniform UniformScale {
+    vec4 uScale;
+  };
+
+  vec4 vert() {
+    vTextureCoord = (aVertexPosition + 1.0) / 2.0;
+    vec4 pos = vec4(aVertexPosition, 0.0, 1.0) * uScale;
+    return cc_matViewProj * pos;
+  }
+}%
+
+CCProgram video-fs %{
+  precision mediump float;
+  uniform sampler2D uSampler;
+  in vec2 vTextureCoord;
+
+  vec4 frag() {
+    return texture2D(uSampler, vTextureCoord);
+  }
+}%
