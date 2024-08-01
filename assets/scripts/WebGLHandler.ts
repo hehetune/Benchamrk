@@ -1,11 +1,12 @@
 import {
   _decorator,
   Component,
-  Node,
-  VideoPlayer,
+  ImageAsset,
+  Sprite,
+  SpriteFrame,
+  Texture2D,
   UITransform,
-  Size,
-  Vec3,
+  VideoPlayer,
 } from "cc";
 const { ccclass, property } = _decorator;
 
@@ -39,36 +40,63 @@ export class WebGLHandler extends Component {
   private texture: WebGLTexture = null;
   private count = 0;
   private cost = 0;
-  private MAX = 10000;
+  private MAX = 100000;
 
   private canvas: HTMLCanvasElement = null;
+  @property(Sprite)
+  private videoSprite: Sprite = null;
+  private videoUITransform: UITransform = null;
+  private videoSpriteFrame: SpriteFrame = null;
+  private videoTexture: Texture2D = null;
+
+  private shaderProgram: WebGLProgram = null;
 
   start() {
-    // this.initWebGL();
-    // this.videoPlayer.node.on("ready-to-play", this.onVideoReady, this);
+    this.initWebGL();
+    //   this.videoPlayer.node.on("ready-to-play", this.onVideoReady, this);
     this.videoPlayer.nativeVideo.src =
       "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+    this.videoPlayer.nativeVideo.autoplay = true;
+    this.videoPlayer.nativeVideo.width = 320;
+    this.videoPlayer.nativeVideo.height = 180;
+    this.videoPlayer.nativeVideo.controls = true;
     this.videoPlayer.nativeVideo.crossOrigin = "anonymous";
+
+    this.videoUITransform = this.videoSprite.node.getComponent(UITransform);
+    this.videoUITransform.setContentSize(320, 180);
+    // this.videoSpriteFrame = new SpriteFrame();
+    // this.videoTexture = new Texture2D();
+    // this.videoSpriteFrame.texture = this.videoTexture;
+    // this.videoSprite.spriteFrame = this.videoSpriteFrame;
   }
 
   initWebGL() {
     // Create an HTML5 canvas
     this.canvas = document.createElement("canvas");
 
-    // Add the canvas to the HTML body
-    document.body.appendChild(this.canvas);
+    // const cocoContainer = document.getElementById("Cocos3dGameContainer");
+    // cocoContainer.appendChild(this.canvas);
 
     // Set the size of the canvas
     this.canvas.width = 1280; // Example width
     this.canvas.height = 720; // Example height
-    this.canvas.style.width = "320px"; // Example display width
-    this.canvas.style.height = "180px"; // Example display height
+    // this.canvas.style.width = "320px"; // Example display width
+    // this.canvas.style.height = "180px"; // Example display height
+    // this.canvas.style.visibility = "visible";
+    // this.canvas.style.position = "absolute";
+    // this.canvas.style.top = "0px";
+    // this.canvas.style.right = "0px";
+    // this.canvas.style.transformOrigin = "0px 100% 0px";
+    // this.canvas.style.zIndex = "0";
+    // this.canvas.style.objectFit = "fill";
+    // this.canvas.style.transform = "matrix(1, 0, 0, 1, -135, 150)";
+    // this.canvas.style.opacity = "0";
 
     // Set WebGL context for canvas
     this.gl = this.canvas.getContext("webgl2") as WebGL2RenderingContext;
 
     const { vertexShader, fragmentShader } = this.initRenderShader(this.gl);
-    const shaderProgram = this.createProgram(
+    this.shaderProgram = this.createProgram(
       this.gl,
       vertexShader,
       fragmentShader
@@ -79,11 +107,11 @@ export class WebGLHandler extends Component {
     ]);
 
     const aVertexPositionLocation = this.gl.getAttribLocation(
-      shaderProgram,
+      this.shaderProgram,
       "aVertexPosition"
     );
     const uScaleVectorLocation = this.gl.getUniformLocation(
-      shaderProgram,
+      this.shaderProgram,
       "uScale"
     );
     this.setShaderBuffer(this.gl, aVertexPositionLocation, positionVertices);
@@ -91,24 +119,13 @@ export class WebGLHandler extends Component {
     this.gl.uniform4fv(uScaleVectorLocation, [1, 1, 0.0, 1.0]);
 
     const uSamplerLocation = this.gl.getUniformLocation(
-      shaderProgram,
+      this.shaderProgram,
       "uSampler"
     );
     this.gl.uniform1i(uSamplerLocation, 0);
 
     this.texture = this.createTexture(this.gl);
     this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, 1);
-
-    const cocoContainer = document.getElementById("Cocos3dGameContainer");
-
-    cocoContainer.appendChild(this.canvas);
-    cocoContainer.style.position = "relative";
-
-    // Set CSS for the canvas
-    // this.canvas.style.opacity = "0";
-    this.canvas.style.position = "absolute";
-    this.canvas.style.bottom = "200px";
-    this.canvas.style.left = "134px";
   }
 
   initRenderShader(gl: WebGL2RenderingContext) {
@@ -168,24 +185,49 @@ export class WebGLHandler extends Component {
     gl.enableVertexAttribArray(location);
   }
 
+  private clicked: boolean = false;
+
   onVideoReady() {
-    this.gl.texImage2D(
-      this.gl.TEXTURE_2D,
-      0,
-      this.gl.RGB,
-      this.gl.RGB,
-      this.gl.UNSIGNED_BYTE,
-      this.videoPlayer.nativeVideo
-    );
-    this.render();
+    // this.gl.texImage2D(
+    //   this.gl.TEXTURE_2D,
+    //   0,
+    //   this.gl.RGB,
+    //   this.gl.RGB,
+    //   this.gl.UNSIGNED_BYTE,
+    //   this.videoPlayer.nativeVideo
+    // );
+    this.clicked = true;
+    this.videoTexture = new Texture2D();
+    this.videoSpriteFrame = new SpriteFrame();
+    // this.render();
   }
 
   showCopyCanvas() {
-    this.initWebGL();
+    //   this.initWebGL();
     this.onVideoReady();
     // this.canvas.style.opacity = "1";
   }
 
+  private _time: number = 0;
+  private _accumulator: number = 0;
+  private FIXED_DELTA_TIME: number = 1 / 60;
+
+  protected update(deltaTime: number): void {
+    this._time += deltaTime;
+
+    this._accumulator += deltaTime;
+
+    if (this._accumulator >= this.FIXED_DELTA_TIME) {
+      this.fixedUpdate();
+      this._accumulator -= this.FIXED_DELTA_TIME;
+    }
+  }
+
+  protected fixedUpdate() {
+    if (!this.clicked) return;
+    this.render();
+  }
+  private imageAsset: ImageAsset = null;
   render() {
     if (this.count >= this.MAX) {
       console.info({
@@ -210,8 +252,38 @@ export class WebGLHandler extends Component {
     );
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
 
+    // Trigger updates for texture and sprite frame
+    // this.videoTexture.reset(this.canvas);
+    // this.videoTexture.image = new ImageAsset(this.canvas);
+    // this.videoSpriteFrame.reset();
+    // this.videoSpriteFrame.texture = this.videoTexture;
+    // this.videoSprite.spriteFrame = this.videoSpriteFrame;
+
+    // this.imageAsset. = this.canvas;
+
+    // // Trigger updates for texture and sprite frame
+    // this.videoTexture.uploadData(this.imageAsset);
+    // this.videoSpriteFrame.texture = this.videoTexture;
+    // this.videoSprite.spriteFrame = this.videoSpriteFrame;
+
+    // this.videoTexture.image = new ImageAsset(this.canvas);
+    // this.videoTexture.updateMipmaps(0, 1)
+    // this.videoTexture.updateImage()
+    // this.videoTexture.mipmaps[0] = new ImageAsset(this.canvas);
+    this.videoTexture = new Texture2D();
+    this.videoTexture.image = new ImageAsset(this.canvas);
+    // this.videoSpriteFrame = new SpriteFrame();
+    this.videoSpriteFrame.texture = this.videoTexture;
+    this.videoSprite.spriteFrame = this.videoSpriteFrame;
+
+    // this.videoTexture = new Texture2D();
+    // this.videoTexture.image = new ImageAsset(this.canvas);
+    // this.videoSpriteFrame = new SpriteFrame();
+    // this.videoSpriteFrame.texture = this.videoTexture;
+    // this.videoSprite.spriteFrame = this.videoSpriteFrame;
+
     const duration = performance.now() - t;
     this.cost += duration;
-    requestAnimationFrame(this.render.bind(this));
+    // requestAnimationFrame(this.render.bind(this));
   }
 }
